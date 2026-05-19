@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
-
-// Import Logo Baru MainPadel dari folder assets
-import logoMainPadel from '../assets/logo-mainpadel.png';
+import Navbar from '../components/Navbar';
 
 export default function Booking() {
   const navigate = useNavigate();
@@ -24,18 +22,11 @@ export default function Booking() {
     checkUser();
   }, []);
 
-  // Fungsi Log Out Akun
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    alert("Berhasil keluar akun.");
-  };
-
   // Fungsi Proses Reservasi / Checkout
   const handleCheckout = (e) => {
     e.preventDefault();
     
-    // Proteksi: Jika user belum verifikasi/login, tendang ke halaman login
+    // Proteksi: Jika user belum verifikasi/login, lempar ke halaman login
     if (!user) {
       alert("Kamu harus masuk akun terlebih dahulu untuk memesan lapangan!");
       navigate('/login');
@@ -53,50 +44,8 @@ export default function Booking() {
   return (
     <div className="min-h-screen bg-gray-50 font-sans pb-12">
       
-      {/* NAVBAR / HEADER UTAMA */}
-      <nav className="bg-white shadow-sm border-b border-gray-100 p-4 sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          
-          {/* Sisi Kiri: Logo Baru Official */}
-          <div className="flex items-center gap-3">
-            <img 
-              src={logoMainPadel} 
-              alt="MainPadel Logo" 
-              className="h-14 w-auto object-contain" 
-            />
-            <div className="hidden md:block border-l border-gray-200 pl-3">
-              <p className="text-[10px] text-gray-400 font-medium tracking-wide uppercase">Slogan</p>
-              <p className="text-xs text-gray-500 italic">"Temukan Lapangan, Teman, dan Turnamen Padel Terbaikmu"</p>
-            </div>
-          </div>
-
-          {/* Sisi Kanan: Status Autentikasi User */}
-          <div className="flex items-center gap-3">
-            {user ? (
-              <div className="flex items-center gap-3 bg-green-50 px-3 py-1.5 rounded-full border border-green-100">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-xs font-semibold text-green-800 truncate max-w-[150px]">
-                  {user.email}
-                </span>
-                <button 
-                  onClick={handleLogout} 
-                  className="text-xs bg-white text-red-600 px-2.5 py-1 rounded-full border border-red-200 font-bold hover:bg-red-50 transition"
-                >
-                  Keluar
-                </button>
-              </div>
-            ) : (
-              <button 
-                onClick={() => navigate('/login')} 
-                className="bg-green-600 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-green-700 shadow-sm transition"
-              >
-                Masuk Akun
-              </button>
-            )}
-          </div>
-
-        </div>
-      </nav>
+      {/* Memanggil Navbar Global Multi-Page */}
+      <Navbar />
 
       {/* KONTEN UTAMA RESERVASI */}
       <main className="max-w-4xl mx-auto px-4 mt-8">
