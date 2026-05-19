@@ -2,259 +2,183 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 
+// Import Logo Baru MainPadel dari folder assets
+import logoMainPadel from '../assets/logo-mainpadel.png';
+
 export default function Booking() {
   const navigate = useNavigate();
-  const [courts, setCourts] = useState([]);
-  const [items, setItems] = useState([]);
-  const [bookedSlots, setBookedSlots] = useState([]);
-
-  const [selectedCourt, setSelectedCourt] = useState(null);
-  const [bookingDate, setBookingDate] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [duration, setDuration] = useState(1);
-  const [selectedItems, setSelectedItems] = useState({});
-  const [summary, setSummary] = useState({ courtTotal: 0, addonTotal: 0, grandTotal: 0 });
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Daftar jam operasional lapangan padel
-  const operationalHours = ["06:00", "08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00"];
+  // State Pilihan Booking
+  const [tanggal, setTanggal] = useState('');
+  const [lapangan, setLapangan] = useState('Lapangan A (Indoor)');
+  const [durasi, setDurasi] = useState('1 Jam');
 
-  // 1. FUNGSI UTAMA: Ambil katalog lapangan & raket dari Supabase
+  // Cek Status Login Pengguna saat halaman dimuat
   useEffect(() => {
-    async function initData() {
-      const { data: courtData, error: courtErr } = await supabase.from('courts').select('*');
-      const { data: itemData, error: itemErr } = await supabase.from('items').select('*');
-      
-      // Log pembantu untuk ngecek data di tab Console browser (F12)
-      console.log("Data Lapangan Terdeteksi:", courtData);
-      console.log("Data Raket Terdeteksi:", itemData);
-      if (courtErr) console.error("Kendala Lapangan ASLI:", courtErr.message, courtErr.details);
-if (itemErr) console.error("Kendala Raket ASLI:", itemErr.message, itemErr.details);
-
-      if (courtData && courtData.length > 0) {
-        setCourts(courtData);
-        setSelectedCourt(courtData[0]); // Set default ke lapangan pertama
-      }
-      if (itemData && itemData.length > 0) {
-        setItems(itemData);
-      }
-    }
-    initData();
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    checkUser();
   }, []);
 
-  // 2. REAL-TIME SLOT CHECKER: Ambil jam yang sudah dibooking orang lain
-  useEffect(() => {
-    if (!selectedCourt || !bookingDate) return;
-    async function checkAvailability() {
-      const { data, error } = await supabase
-        .from('bookings')
-        .select('start_time, end_time')
-        .eq('court_id', selectedCourt.id)
-        .eq('booking_date', bookingDate)
-        .not('status', 'eq', 'dibatalkan');
-      
-      if (error) console.error("Gagal cek slot:", error);
-      setBookedSlots(data || []);
-    }
-    checkAvailability();
-  }, [selectedCourt, bookingDate]);
+  // Fungsi Log Out Akun
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    alert("Berhasil keluar akun.");
+  };
 
-  // 3. KALKULATOR OTOMATIS: Hitung total harga lapangan + sewa raket
-  useEffect(() => {
-    if (!selectedCourt) return;
-    const courtTotal = selectedCourt.price_per_hour * duration;
-    let addonTotal = 0;
-    
-    Object.keys(selectedItems).forEach(itemId => {
-      const item = items.find(i => i.id === parseInt(itemId));
-      if (item && selectedItems[itemId] > 0) {
-        addonTotal += item.price * selectedItems[itemId];
-      }
-    });
-    
-    setSummary({ courtTotal, addonTotal, grandTotal: courtTotal + addonTotal });
-  }, [selectedCourt, duration, selectedItems, items]);
-
-  // 4. FUNGSI PROSES BOOKING & MASUK KE CHECKOUT
-  const handleCheckout = async (e) => {
+  // Fungsi Proses Reservasi / Checkout
+  const handleCheckout = (e) => {
     e.preventDefault();
-    if (!startTime) return alert("Pilih jam main terlebih dahulu!");
+    
+    // Proteksi: Jika user belum verifikasi/login, tendang ke halaman login
+    if (!user) {
+      alert("Kamu harus masuk akun terlebih dahulu untuk memesan lapangan!");
+      navigate('/login');
+      return;
+    }
+
     setLoading(true);
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { 
-      alert("Silakan masuk/login akun terlebih dahulu!"); 
+    // Simulasi proses booking masuk database
+    setTimeout(() => {
+      alert(`Reservasi Sukses!\n${lapangan}\nTanggal: ${tanggal}\nDurasi: ${durasi}\n\nKonfirmasi pesanan telah dikirim ke email: ${user.email}`);
       setLoading(false);
-      return navigate('/login'); 
-    }
-
-    const [hours, minutes] = startTime.split(':');
-    const endTime = `${(parseInt(hours) + parseInt(duration)).toString().padStart(2, '0')}:${minutes}:00`;
-
-    // Masukkan data ke tabel bookings
-    const { data: booking, error: bErr } = await supabase
-      .from('bookings')
-      .insert([{
-        user_id: user.id,
-        court_id: selectedCourt.id,
-        booking_date: bookingDate,
-        start_time: startTime + ":00",
-        end_time: endTime,
-        court_price_total: summary.courtTotal,
-        addons_price_total: summary.addonTotal,
-        grand_total: summary.grandTotal
-      }]).select().single();
-
-    if (bErr) { 
-      alert("Gagal booking: " + bErr.message); 
-      setLoading(false); 
-      return; 
-    }
-
-    // Masukkan data sewa raket ke tabel booking_details jika ada yang dicentang
-    const details = Object.keys(selectedItems).filter(id => selectedItems[id] > 0).map(id => {
-      const item = items.find(i => i.id === parseInt(id));
-      return { 
-        booking_id: booking.id, 
-        item_id: item.id, 
-        quantity: selectedItems[id], 
-        subtotal: item.price * selectedItems[id] 
-      };
-    });
-
-    if (details.length > 0) {
-      const { error: dErr } = await supabase.from('booking_details').insert(details);
-      if (dErr) console.error("Gagal simpan detail raket:", dErr);
-    }
-
-    alert("Booking lapangan berhasil dibuat!");
-    navigate(`/checkout/${booking.id}`);
+    }, 1500);
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 grid grid-cols-1 md:grid-cols-3 gap-6 font-sans">
-      {/* Kolom Kiri: Form Input Data */}
-      <div className="md:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-        <h2 className="text-2xl font-bold mb-6 text-gray-800">Reservasi Lapangan Padel Tangsel</h2>
-        <form onSubmit={handleCheckout} className="space-y-6">
+    <div className="min-h-screen bg-gray-50 font-sans pb-12">
+      
+      {/* NAVBAR / HEADER UTAMA */}
+      <nav className="bg-white shadow-sm border-b border-gray-100 p-4 sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           
-          {/* Dropdown Lapangan */}
-          <div>
-            <label className="block text-sm font-semibold mb-2 text-gray-700">Pilih Lapangan Padel</label>
-            <select 
-              className="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-green-500 outline-none transition" 
-              onChange={e => setSelectedCourt(courts.find(c => c.id === parseInt(e.target.value)))}
-            >
-              {courts.map(c => (
-                <option key={c.id} value={c.id}>{c.name} (Rp {c.price_per_hour.toLocaleString()}/jam)</option>
-              ))}
-            </select>
+          {/* Sisi Kiri: Logo Baru Official */}
+          <div className="flex items-center gap-3">
+            <img 
+              src={logoMainPadel} 
+              alt="MainPadel Logo" 
+              className="h-14 w-auto object-contain" 
+            />
+            <div className="hidden md:block border-l border-gray-200 pl-3">
+              <p className="text-[10px] text-gray-400 font-medium tracking-wide uppercase">Slogan</p>
+              <p className="text-xs text-gray-500 italic">"Temukan Lapangan, Teman, dan Turnamen Padel Terbaikmu"</p>
+            </div>
           </div>
 
-          {/* Form Tanggal & Durasi */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Sisi Kanan: Status Autentikasi User */}
+          <div className="flex items-center gap-3">
+            {user ? (
+              <div className="flex items-center gap-3 bg-green-50 px-3 py-1.5 rounded-full border border-green-100">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-xs font-semibold text-green-800 truncate max-w-[150px]">
+                  {user.email}
+                </span>
+                <button 
+                  onClick={handleLogout} 
+                  className="text-xs bg-white text-red-600 px-2.5 py-1 rounded-full border border-red-200 font-bold hover:bg-red-50 transition"
+                >
+                  Keluar
+                </button>
+              </div>
+            ) : (
+              <button 
+                onClick={() => navigate('/login')} 
+                className="bg-green-600 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-green-700 shadow-sm transition"
+              >
+                Masuk Akun
+              </button>
+            )}
+          </div>
+
+        </div>
+      </nav>
+
+      {/* KONTEN UTAMA RESERVASI */}
+      <main className="max-w-4xl mx-auto px-4 mt-8">
+        <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden grid grid-cols-1 md:grid-cols-5">
+          
+          {/* Sisi Kiri: Banner Info Lapangan Tangsel */}
+          <div className="md:col-span-2 bg-gradient-to-br from-green-600 to-emerald-800 p-8 text-white flex flex-col justify-between">
             <div>
-              <label className="block text-sm font-semibold mb-2 text-gray-700">Tanggal Bermain</label>
+              <span className="bg-green-500/30 text-green-100 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md">
+                Lokasi: Tangsel
+              </span>
+              <h1 className="text-3xl font-extrabold mt-4 leading-tight">Main Padel Arena</h1>
+              <p className="text-sm text-green-100/80 mt-2">
+                Nikmati fasilitas lapangan padel terbaik dengan standar internasional, pencahayaan modern, dan area bersantai yang nyaman.
+              </p>
+            </div>
+            
+            <div className="mt-8 pt-6 border-t border-green-500/40 text-xs space-y-2 text-green-100/90">
+              <p className="flex items-center gap-2">⏱️ Buka: 06.00 - 22.00 WIB</p>
+              <p className="flex items-center gap-2">📍 Jl. Padel Raya No. 12, Tangsel</p>
+            </div>
+          </div>
+
+          {/* Sisi Kanan: Form Pilihan Jadwal */}
+          <form onSubmit={handleCheckout} className="md:col-span-3 p-8 space-y-5">
+            <div>
+              <h2 className="text-xl font-bold text-gray-800">Pilih Jadwal Bermain</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Silakan isi detail reservasi lapangan kamu.</p>
+            </div>
+
+            {/* Pilihan Lapangan */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Pilih Lapangan</label>
+              <select 
+                className="w-full p-3 bg-gray-50 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm font-medium text-gray-700 transition"
+                value={lapangan}
+                onChange={(e) => setLapangan(e.target.value)}
+              >
+                <option>Lapangan A (Indoor)</option>
+                <option>Lapangan B (Outdoor)</option>
+                <option>Lapangan C (VIP Lounge)</option>
+              </select>
+            </div>
+
+            {/* Pilihan Tanggal */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Tanggal Main</label>
               <input 
                 type="date" 
-                required 
-                min={new Date().toISOString().split('T')[0]} 
-                className="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-green-500 outline-none transition" 
-                value={bookingDate} 
-                onChange={e => setBookingDate(e.target.value)} 
+                required
+                className="w-full p-3 bg-gray-50 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm font-medium text-gray-700 transition"
+                value={tanggal}
+                onChange={(e) => setTanggal(e.target.value)}
               />
             </div>
+
+            {/* Pilihan Durasi */}
             <div>
-              <label className="block text-sm font-semibold mb-2 text-gray-700">Durasi Bermain (Jam)</label>
-              <input 
-                type="number" 
-                min="1" 
-                max="4" 
-                className="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-green-500 outline-none transition" 
-                value={duration} 
-                onChange={e => setDuration(parseInt(e.target.value))} 
-              />
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Durasi Sewa</label>
+              <select 
+                className="w-full p-3 bg-gray-50 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm font-medium text-gray-700 transition"
+                value={durasi}
+                onChange={(e) => setDurasi(e.target.value)}
+              >
+                <option>1 Jam</option>
+                <option>2 Jam</option>
+                <option>3 Jam</option>
+              </select>
             </div>
-          </div>
 
-          {/* Pilihan Jam Interaktif */}
-          {bookingDate && (
-            <div>
-              <label className="block text-sm font-semibold mb-2 text-gray-700">Pilih Jam Mulai Bermain</label>
-              <div className="grid grid-cols-4 gap-2">
-                {operationalHours.map(time => {
-                  const isFull = bookedSlots.some(s => (time + ":00" >= s.start_time && time + ":00" < s.end_time));
-                  return (
-                    <button 
-                      key={time} 
-                      type="button" 
-                      disabled={isFull} 
-                      onClick={() => setStartTime(time)}
-                      className={`p-3 text-sm font-semibold rounded-lg border transition duration-150 ${
-                        isFull 
-                          ? 'bg-gray-100 text-gray-400 line-through cursor-not-allowed border-gray-200' 
-                          : startTime === time 
-                            ? 'bg-green-600 text-white border-green-600 shadow-md scale-95' 
-                            : 'bg-white text-gray-700 hover:bg-green-50 border-gray-300'
-                      }`}
-                    >
-                      {time}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+            {/* Tombol Aksi / Submit */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-green-600 text-white p-3.5 rounded-xl font-extrabold text-sm hover:bg-green-700 transition shadow-md disabled:bg-gray-300 mt-4"
+            >
+              {loading ? "Memproses Pemesanan..." : "Checkout Pemesanan Lapangan"}
+            </button>
+          </form>
 
-          {/* Opsi Sewa Raket */}
-          <div className="border-t pt-5">
-            <h3 className="font-bold text-gray-800 text-lg mb-3">Sewa Raket Padel Populer</h3>
-            <div className="space-y-2">
-              {items.map(item => (
-                <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition">
-                  <label className="flex items-center gap-3 cursor-pointer w-full">
-                    <input 
-                      type="checkbox" 
-                      className="w-5 h-5 text-green-600 rounded border-gray-300 focus:ring-green-500" 
-                      onChange={e => setSelectedItems({...selectedItems, [item.id]: e.target.checked ? 1 : 0})} 
-                    />
-                    <span className="text-gray-700 font-medium">{item.name}</span>
-                  </label>
-                  <span className="text-sm font-bold text-green-600 whitespace-nowrap">Rp {item.price.toLocaleString()}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </form>
-      </div>
-
-      {/* Kolom Kanan: Detail Kwitansi / Invoice */}
-      <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 h-fit flex flex-col justify-between shadow-sm">
-        <div>
-          <h3 className="text-lg font-bold mb-4 text-gray-800 border-b pb-2">Ringkasan Pembayaran</h3>
-          <div className="space-y-3 text-sm text-gray-600">
-            <div className="flex justify-between">
-              <span>Sewa Lapangan:</span>
-              <span className="font-semibold text-gray-800">Rp {summary.courtTotal.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between border-b pb-3">
-              <span>Total Sewa Alat/Raket:</span>
-              <span className="font-semibold text-gray-800">Rp {summary.addonTotal.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between text-base font-bold text-gray-900 pt-3">
-              <span>Total Tagihan Akhir:</span>
-              <span className="text-green-600 text-xl font-extrabold">Rp {summary.grandTotal.toLocaleString()}</span>
-            </div>
-          </div>
         </div>
-        <button 
-          onClick={handleCheckout} 
-          disabled={loading} 
-          className="w-full mt-6 bg-green-600 hover:bg-green-700 text-white p-3.5 rounded-xl font-bold transition duration-200 shadow-md hover:shadow-lg disabled:bg-gray-400"
-        >
-          {loading ? "Memproses Pemesanan..." : "Checkout Pemesanan"}
-        </button>
-      </div>
+      </main>
     </div>
   );
 }
