@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate, Link } from 'react-router-dom';
 
+// Import Logo Baru MainPadel dari folder assets
+import logoMainPadel from '../assets/logo-mainpadel.png';
+
 export default function Login() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -32,10 +35,20 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4 font-sans">
       <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
-        {/* Header Form */}
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-extrabold text-gray-800">Masuk Akun</h2>
-          <p className="text-sm text-gray-500 mt-1">Sistem Reservasi Lapangan Padel Tangsel</p>
+        
+        {/* HEADER DENGAN LOGO RESMI */}
+        <div className="flex flex-col items-center text-center mb-6">
+          <img 
+            src={logoMainPadel} 
+            alt="MainPadel Logo" 
+            className="h-20 w-auto object-contain mb-2" 
+          />
+          <p className="text-xs text-gray-450 italic max-w-[280px]">
+            "Temukan Lapangan, Teman, dan Turnamen Padel Terbaikmu"
+          </p>
+          <div className="w-full border-t border-gray-100 my-4"></div>
+          <h2 className="text-xl font-extrabold text-gray-800">Masuk Akun</h2>
+          <p className="text-xs text-gray-450 mt-0.5">Sistem Reservasi Lapangan Padel Tangsel</p>
         </div>
 
         {/* Form Login Email */}
