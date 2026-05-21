@@ -16,10 +16,10 @@ export default function CheckEmail() {
         </div>
 
         <h2 className="text-2xl font-extrabold text-gray-800 mb-2">Verifikasi Email Dikirim!</h2>
-        <p className="text-sm text-gray-600 mb-6">
-          Kami telah mengirimkan link konfirmasi akun ke <br />
-          <span className="font-bold text-gray-800">{email}</span>.
-        </p>
+        <div className="text-sm text-gray-600 mb-6">
+          <p>Kami telah mengirimkan link konfirmasi akun ke</p>
+          <p className="font-bold text-gray-800 mt-1">{email}</p>
+        </div>
 
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-800 text-left mb-6 space-y-1">
           <p className="font-bold">Langkah berikutnya:</p>
